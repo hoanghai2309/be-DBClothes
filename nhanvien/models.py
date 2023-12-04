@@ -9,6 +9,7 @@ from django.db import models
 
 
 
+
 class Chinhanh(models.Model):
     machinhanh = models.CharField(db_column='MaChiNhanh', primary_key=True, max_length=3)  # Field name made lowercase.
     tenchinhanh = models.CharField(db_column='TenChiNhanh', max_length=20)  # Field name made lowercase.
@@ -34,6 +35,8 @@ class Coupon(models.Model):
 
 
 
+
+
 class Donhang(models.Model):
     manhanvien = models.ForeignKey('Nhanvienbanhang', models.DO_NOTHING, db_column='MaNhanVien')  # Field name made lowercase.
     madonhang = models.CharField(db_column='MaDonHang', primary_key=True, max_length=15)  # Field name made lowercase.
@@ -46,6 +49,16 @@ class Donhang(models.Model):
     class Meta:
         managed = False
         db_table = 'donhang'
+
+
+class Hanche(models.Model):
+    mauudai = models.OneToOneField('Uudai', models.DO_NOTHING, db_column='MaUuDai', primary_key=True)  # Field name made lowercase. The composite primary key (MaUuDai, UuDaiHanChe) found, that is not supported. The first column is selected.
+    uudaihanche = models.ForeignKey('Uudai', models.DO_NOTHING, db_column='UuDaiHanChe', related_name='hanche_uudaihanche_set')  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'hanche'
+        unique_together = (('mauudai', 'uudaihanche'),)
 
 
 class Khachhang(models.Model):
@@ -106,7 +119,6 @@ class Quanly(models.Model):
 
 class Uudai(models.Model):
     mauudai = models.CharField(db_column='MaUuDai', primary_key=True, max_length=8)  # Field name made lowercase.
-    mahanche = models.ForeignKey('self', models.DO_NOTHING, db_column='MaHanChe', blank=True, null=True)  # Field name made lowercase.
     sotientoithieu = models.IntegerField(db_column='SoTienToiThieu', blank=True, null=True)  # Field name made lowercase.
     tinhtrang = models.IntegerField(db_column='TinhTrang', blank=True, null=True)  # Field name made lowercase.
     batdau = models.DateField(db_column='BatDau')  # Field name made lowercase.

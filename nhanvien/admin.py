@@ -11,4 +11,5 @@ admin.site.register(Khachhang)
 admin.site.register(Donhang)
 admin.site.register(Uudai)
 admin.site.register(Coupon)
+admin.site.register(Hanche)
 # Register your models here.
