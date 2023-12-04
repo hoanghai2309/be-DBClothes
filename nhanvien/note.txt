@@ -1,0 +1,6 @@
+python manage.py inspectdb > nhanvien/models.py
+đổi dạng file ở file model.py
+from nhanvien.models import Nhanvienbanhang
+
+# Now try to retrieve all objects
+Nhanvienbanhang.objects.all()
