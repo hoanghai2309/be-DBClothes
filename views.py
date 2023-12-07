@@ -1,4 +1,3 @@
-from MySQLdb import  OperationalError
 from django.db.models import Max, Sum, Min
 from rest_framework.decorators import action
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -10,110 +9,124 @@ from rest_framework.views import APIView
 from django.db.models import Prefetch
 from django.db.models import Q
 from datetime import datetime
-from django.db import connection
+
 from rest_framework import viewsets
 from .models import Nhanvienbanhang, Donhang
 from .serializers import NhanvienbanhangSerializer,QuanlySerializer
-from django.db import connection, DatabaseError
-from django.db import connection
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import NhanvienSerializer, QuanlySerializer, NhanvienbanhangSerializer, NhanvienvanchuyenSerializer
-from django.db.models import Max, Min
-
 
 class EmployeeListCreateAPIView(ListCreateAPIView):
     queryset = Nhanvien.objects.all()
     serializer_class = NhanvienSerializer
 
     def create(self, request, *args, **kwargs):
-        queryset = Nhanvien.objects.all()
         position = request.data.get('vitri', None)
         salary = int(request.data.get('luong', None))
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc(
-                    'CreateEmployee',
-                    [
-                        request.data.get('manhanvien'),
-                        request.data.get('machinhanh'),
-                        request.data.get('ten'),
-                        salary,
-                        request.data.get('tuoi'),
-                        request.data.get('gioitinh'),
-                        request.data.get('trangthai'),
-                        position,
-                        request.data.get('calamviec', None),
-                        request.data.get('namkinhnghiem', None),
-                        request.data.get('banglaixe', None),
-                    ]
-                )
+        if position == 'A':
+            # Create Nhanvien instance
+            nhanvien_serializer = self.get_serializer(data=request.data)
+            nhanvien_serializer.is_valid(raise_exception=True)
 
-                result = cursor.fetchone()
+            if salary is not None:
+                max_salary = Nhanvien.objects.exclude(vitri='A').aggregate(Max('luong'))['luong__max']
+                if salary <= max_salary:
+                    return Response({"detail": "Salary of employee with position A must be higher than all other employees' salaries."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            nhanvien_instance = nhanvien_serializer.save()
+            # Create Nhanvienbanhang instance
+            nhanvienbanhang_data = {
+                'manhanvien': nhanvien_instance.manhanvien,
+                'machinhanh': nhanvien_instance.machinhanh.machinhanh,
+                'namkinhnghiem': request.data.get('namkinhnghiem', None)
+            }
+            Quanly_serializer = QuanlySerializer(data=nhanvienbanhang_data)
+            Quanly_serializer.is_valid(raise_exception=True)
+            Quanly_serializer.save()
 
-                if result[0] == 1:
-                    # Error occurred in stored procedure
-                    error_message = result[1]
-                    if 'Salary of an employee with position' in error_message:
-                        return Response(
-                            {
-                                "detail": "Salary of employee with position A must be higher than all other employees' salaries."},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+            headers = self.get_success_headers(nhanvien_serializer.data)
+            return Response(nhanvien_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        elif position == 'B':
+            # Create Nhanvien instance
+            nhanvien_serializer = self.get_serializer(data=request.data)
+            nhanvien_serializer.is_valid(raise_exception=True)
 
-        except DatabaseError as e:
-            error_message = str(e)
-            if "Salary of an employee with position" in error_message:
-                return Response(
-                    {"detail": error_message},
-                    status=status.HTTP_400_BAD_REQUEST)
-            if "'NoneType' object is not subscriptable" in error_message:
-                pass
-        success_message = {"detail": "Employee created successfully."}
-        return Response(success_message, status=status.HTTP_201_CREATED)
+            if salary is not None:
+                min_salary_A = Nhanvien.objects.filter(vitri='A').aggregate(Min('luong'))['luong__min']
+                if salary >= min_salary_A:
+                    return Response({"detail": "Salary of employee with position A must be higher than all other employees' salaries."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            nhanvien_instance = nhanvien_serializer.save()
+            # Create Nhanvienbanhang instance
+            nhanvienbanhang_data = {
+                'manhanvien': nhanvien_instance.manhanvien,
+                'calamviec': request.data.get('calamviec', None)
+            }
+            nhanvienbanhang_serializer = NhanvienbanhangSerializer(data=nhanvienbanhang_data)
+            nhanvienbanhang_serializer.is_valid(raise_exception=True)
+            nhanvienbanhang_serializer.save()
+
+            headers = self.get_success_headers(nhanvien_serializer.data)
+            return Response(nhanvien_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        elif position == 'C':
+            # Create Nhanvien instance
+            nhanvien_serializer = self.get_serializer(data=request.data)
+            nhanvien_serializer.is_valid(raise_exception=True)
+            if salary is not None:
+                min_salary_A = Nhanvien.objects.filter(vitri='A').aggregate(Min('luong'))['luong__min']
+                if salary >= min_salary_A:
+                    return Response({"detail": "Salary of employee with position A must be higher than all other employees' salaries."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            nhanvien_instance = nhanvien_serializer.save()
+            # Create Nhanvienbanhang instance
+            Nhanvienvanchuyen_data = {
+                'manhanvien': nhanvien_instance.manhanvien,
+                'banglaixe': request.data.get('banglaixe', None)
+            }
+            Nhanvienvanchuyen_serializer = NhanvienvanchuyenSerializer(data=Nhanvienvanchuyen_data)
+            Nhanvienvanchuyen_serializer.is_valid(raise_exception=True)
+            Nhanvienvanchuyen_serializer.save()
+
+            headers = self.get_success_headers(nhanvien_serializer.data)
+            return Response(nhanvien_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-from django.db import connection
+        else:
+            error_message = "Invalid position entered. Please provide a valid position (A, B, or C)."
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class EmployeeRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
-    # ... existing code ...
     queryset = Nhanvien.objects.all()
     serializer_class = NhanvienSerializer
     lookup_field = 'manhanvien'
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        position = instance.vitri
         salary = int(request.data.get('luong', None))
 
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('UpdateEmployee', [instance.manhanvien, salary])
-                # No need to fetch the result here, as the procedure doesn't return anything
-
-            success_message = {"detail": "Employee updated successfully."}
-
-            return super().update(request, *args, **kwargs)
-        except DatabaseError as e:
-            error_message = str(e)
-            if "Salary of employee with position" in error_message:
+        if position == 'A' and salary is not None:
+            # Check if the salary is higher than all other employees' salaries
+            max_salary = Nhanvien.objects.exclude(vitri='A').aggregate(Max('luong'))['luong__max']
+            if salary <= max_salary:
+                return Response({"detail": "Salary of employee with position A must be higher than all other employees' salaries."}, status=status.HTTP_400_BAD_REQUEST)
+        if position != 'A' and salary is not None:
+            min_salary_A = Nhanvien.objects.filter(vitri='A').aggregate(Min('luong'))['luong__min']
+            if salary >= min_salary_A:
                 return Response(
-                    {"detail": error_message},
+                    {"detail": "Salary of employee with position A must be higher than all other employees' salaries."},
                     status=status.HTTP_400_BAD_REQUEST)
-
-            return Response(
-                {"detail": error_message},
-                status=status.HTTP_400_BAD_REQUEST)
-
+        return super().update(request, *args, **kwargs)
 
 
 
     def perform_destroy(self, instance):
-        # ... existing code ...
-
-        # Call the SQL delete procedure
-        with connection.cursor() as cursor:
-            cursor.callproc('DeleteEmployee', [instance.manhanvien])
-
+        if instance.trangthai == '0':
+            # If trangthai is 0, delete the instance
+            instance.delete()
+        else:
+            # If trangthai is not 0, set trangthai to 2
+            instance.trangthai = '2'
+            instance.save()
 
 
 
@@ -245,10 +258,10 @@ class DonhangViewSet(viewsets.ViewSet):
             donhang.tongtien = tongtien
             donhang.save()
 
-            return Response({"message": "Coupons applied successfully.", "new_total": tongtien},status=200)
+            return Response({"message": "Coupons applied successfully.", "new_total": tongtien})
         elif request.method == 'GET':
             if donhang.tinhtrang==1:
-                return Response({"tinh trang":1})
+                return Response("don hang da thanh toan")
             # Return the current details of the employee
             data = {
                 'ma1': None,
