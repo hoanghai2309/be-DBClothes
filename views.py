@@ -21,14 +21,15 @@ from rest_framework import status
 from .serializers import NhanvienSerializer, QuanlySerializer, NhanvienbanhangSerializer, NhanvienvanchuyenSerializer
 from django.db.models import Max, Min
 
+
 class EmployeeListCreateAPIView(ListCreateAPIView):
     queryset = Nhanvien.objects.all()
     serializer_class = NhanvienSerializer
 
     def create(self, request, *args, **kwargs):
+        queryset = Nhanvien.objects.all()
         position = request.data.get('vitri', None)
         salary = int(request.data.get('luong', None))
-
         try:
             with connection.cursor() as cursor:
                 cursor.callproc(
@@ -53,22 +54,23 @@ class EmployeeListCreateAPIView(ListCreateAPIView):
                 if result[0] == 1:
                     # Error occurred in stored procedure
                     error_message = result[1]
-                    if 'Salary of employee with position B or C must be lower than all position A employees'' salaries.' in error_message:
-                        return Response({"detail": "Salary of employee with position A must be higher than all other employees' salaries."},
-                                        status=status.HTTP_400_BAD_REQUEST)
+                    if 'Salary of an employee with position' in error_message:
+                        return Response(
+                            {
+                                "detail": "Salary of employee with position A must be higher than all other employees' salaries."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-            # Fetch newly created employee data
-            new_employee = Nhanvien.objects.get(manhanvien=request.data.get('manhanvien'))
-            serialized_data = self.get_serializer(new_employee).data
-
-            headers = self.get_success_headers(serialized_data)
-            success_message = {"detail": "Employee created successfully."}
-            return Response(success_message, status=status.HTTP_201_CREATED, headers=headers)
-
-        except Exception as e:
-            success_message = {"detail": "Employee created successfully."}
-            if str(e)=="'NoneType' object is not subscriptable": return Response(success_message, status=status.HTTP_201_CREATED)
-
+        except DatabaseError as e:
+            error_message = str(e)
+            if "Salary of an employee with position" in error_message:
+                return Response(
+                    {"detail": error_message},
+                    status=status.HTTP_400_BAD_REQUEST)
+            if "'NoneType' object is not subscriptable" in error_message:
+                pass
+        success_message = {"detail": "Employee created successfully."}
+        return Response(success_message, status=status.HTTP_201_CREATED)
 
 
 from django.db import connection
@@ -93,7 +95,7 @@ class EmployeeRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
             return super().update(request, *args, **kwargs)
         except DatabaseError as e:
             error_message = str(e)
-            if "Salary of employee with position A must be higher than all other employees' salaries." in error_message:
+            if "Salary of employee with position" in error_message:
                 return Response(
                     {"detail": error_message},
                     status=status.HTTP_400_BAD_REQUEST)
